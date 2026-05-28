@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: docuverve-app
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - NODE_ENV=production
+      - CONVERTER_URL=http://converter:3000
+    depends_on:
+      - converter
+    networks:
+      - docuverve-network
+    restart: unless-stopped
+
+  converter:
+    image: gotenberg/gotenberg:8
+    container_name: docuverve-converter
+    ports:
+      - "3000:3000"
+    volumes:
+      # Mount standard and custom fonts into the container to prevent document layout warping
+      - ./fonts:/usr/local/share/fonts:ro
+    networks:
+      - docuverve-network
+    restart: unless-stopped
+
+networks:
+  docuverve-network:
+    driver: bridge

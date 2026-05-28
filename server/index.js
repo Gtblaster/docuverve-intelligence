@@ -25,6 +25,19 @@ app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'docuverve-a
 // ── API Routes ─────────────────────────────────────────────────────────────
 app.use('/api/v1/pdf', apiRouter);
 
+// ── Static Frontend Assets (Production Setup) ──────────────────────────────
+const path = require('path');
+const distPath = path.join(__dirname, '../client/dist');
+app.use(express.static(distPath));
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api')) return next();
+  res.sendFile(path.join(distPath, 'index.html'), (err) => {
+    if (err) {
+      next(); // fallback to 404 if index.html is missing
+    }
+  });
+});
+
 // ── 404 handler ────────────────────────────────────────────────────────────
 app.use((_req, res) => res.status(404).json({ success: false, error: 'Route not found' }));
 
