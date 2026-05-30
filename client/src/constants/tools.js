@@ -55,7 +55,7 @@ export const TOOLS = [
     acceptedFiles: { 'application/pdf': ['.pdf'] },
     wasmEligible: true,
     configSchema: [
-      { key: 'pageIndices', label: 'Pages to Remove', type: 'text', placeholder: 'e.g. [1, 3, 5]', default: '' },
+      { key: 'pageIndices', label: 'Pages to Remove', type: 'text', placeholder: 'e.g. 1, 3-5, 8', default: '' },
     ],
   },
   {
@@ -71,7 +71,7 @@ export const TOOLS = [
     acceptedFiles: { 'application/pdf': ['.pdf'] },
     wasmEligible: true,
     configSchema: [
-      { key: 'pageIndices', label: 'Pages to Extract', type: 'text', placeholder: 'e.g. [2, 4, 6]', default: '' },
+      { key: 'pageIndices', label: 'Pages to Extract', type: 'text', placeholder: 'e.g. 1-4, 6', default: '' },
     ],
   },
   {
@@ -85,9 +85,9 @@ export const TOOLS = [
     endpoint: '/api/v1/pdf/organize/reorder',
     multiFile: false,
     acceptedFiles: { 'application/pdf': ['.pdf'] },
-    wasmEligible: false,
+    wasmEligible: true,
     configSchema: [
-      { key: 'newOrder', label: 'New Page Order', type: 'text', placeholder: 'e.g. [2,0,1,3]', default: '' },
+      { key: 'newOrder', label: 'New Page Order', type: 'text', placeholder: 'e.g. 3, 1, 2, 4-6', default: '' },
     ],
   },
 

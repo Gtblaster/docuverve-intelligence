@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { wasmMerge, wasmSplit, wasmWatermark, wasmRemovePages } from '../lib/wasmProcessors';
+import { wasmMerge, wasmSplit, wasmWatermark, wasmRemovePages, wasmExtractPages, wasmReorderPages } from '../lib/wasmProcessors';
 
 /** Map of tool IDs to their WASM processor functions. */
 const WASM_PROCESSORS = {
@@ -7,8 +7,13 @@ const WASM_PROCESSORS = {
   split: (files, config) => wasmSplit(files[0], config.mode || 'range', config.ranges || ''),
   watermark: (files, config) => wasmWatermark(files[0], config),
   'remove-pages': (files, config) => {
-    const indices = config.pageIndices ? JSON.parse(config.pageIndices) : [];
-    return wasmRemovePages(files[0], indices);
+    return wasmRemovePages(files[0], config.pageIndices || '');
+  },
+  'extract-pages': (files, config) => {
+    return wasmExtractPages(files[0], config.pageIndices || '');
+  },
+  reorder: (files, config) => {
+    return wasmReorderPages(files[0], config.newOrder || '');
   },
 };
 

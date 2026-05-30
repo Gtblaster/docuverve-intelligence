@@ -120,13 +120,27 @@ export async function wasmWatermark(
  * @param {number[]} pageIndices - 1-indexed page numbers to remove
  * @returns {Promise<Blob>} Modified PDF as a Blob
  */
-export async function wasmRemovePages(file, pageIndices = []) {
+export async function wasmRemovePages(file, pageIndices = '') {
   const buffer = await file.arrayBuffer();
   const srcDoc = await PDFDocument.load(buffer, { ignoreEncryption: true });
   const totalPages = srcDoc.getPageCount();
 
-  // Convert 1-indexed to 0-indexed, then compute which pages to keep
-  const zeroIdx = pageIndices.map(n => n - 1);
+  let zeroIdx = [];
+  if (Array.isArray(pageIndices)) {
+    zeroIdx = pageIndices.map(n => n - 1);
+  } else if (typeof pageIndices === 'string' || pageIndices instanceof String) {
+    let rawInput = pageIndices.trim();
+    if (rawInput.startsWith('[') && rawInput.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(rawInput);
+        if (Array.isArray(parsed)) {
+          rawInput = parsed.join(',');
+        }
+      } catch (_) {}
+    }
+    zeroIdx = parseRanges(rawInput, totalPages);
+  }
+
   const keepIndices = Array.from({ length: totalPages }, (_, i) => i).filter(
     i => !zeroIdx.includes(i),
   );
@@ -136,6 +150,108 @@ export async function wasmRemovePages(file, pageIndices = []) {
   pages.forEach(p => newDoc.addPage(p));
   const bytes = await newDoc.save();
   return new Blob([bytes], { type: 'application/pdf' });
+}
+
+/**
+ * WASM Extract Pages — runs entirely in the browser using pdf-lib.
+ * Extracts specified pages (1-indexed) from the PDF.
+ * @param {File} file - Source PDF file
+ * @param {number[]|string} pageIndices - 1-indexed page numbers to extract
+ * @returns {Promise<Blob>} Extracted PDF as a Blob
+ */
+export async function wasmExtractPages(file, pageIndices = '') {
+  const buffer = await file.arrayBuffer();
+  const srcDoc = await PDFDocument.load(buffer, { ignoreEncryption: true });
+  const totalPages = srcDoc.getPageCount();
+
+  let zeroIdx = [];
+  if (Array.isArray(pageIndices)) {
+    zeroIdx = pageIndices.map(n => n - 1);
+  } else if (typeof pageIndices === 'string' || pageIndices instanceof String) {
+    let rawInput = pageIndices.trim();
+    if (rawInput.startsWith('[') && rawInput.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(rawInput);
+        if (Array.isArray(parsed)) {
+          rawInput = parsed.join(',');
+        }
+      } catch (_) {}
+    }
+    zeroIdx = parseRanges(rawInput, totalPages);
+  }
+
+  const validIndices = zeroIdx.filter(i => i >= 0 && i < totalPages);
+
+  const newDoc = await PDFDocument.create();
+  const pages = await newDoc.copyPages(srcDoc, validIndices);
+  pages.forEach(p => newDoc.addPage(p));
+  const bytes = await newDoc.save();
+  return new Blob([bytes], { type: 'application/pdf' });
+}
+
+/**
+ * WASM Reorder Pages — runs entirely in the browser using pdf-lib.
+ * Reorders pages based on 1-based page sequence.
+ * @param {File} file - Source PDF file
+ * @param {number[]|string} newOrder - 1-based page order
+ * @returns {Promise<Blob>} Reordered PDF as a Blob
+ */
+export async function wasmReorderPages(file, newOrder = '') {
+  const buffer = await file.arrayBuffer();
+  const srcDoc = await PDFDocument.load(buffer, { ignoreEncryption: true });
+  const totalPages = srcDoc.getPageCount();
+
+  let zeroIdx = [];
+  if (Array.isArray(newOrder)) {
+    zeroIdx = newOrder.map(n => n - 1);
+  } else if (typeof newOrder === 'string' || newOrder instanceof String) {
+    let rawInput = newOrder.trim();
+    if (rawInput.startsWith('[') && rawInput.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(rawInput);
+        if (Array.isArray(parsed)) {
+          rawInput = parsed.join(',');
+        }
+      } catch (_) {}
+    }
+    zeroIdx = parseReorderRanges(rawInput, totalPages);
+  }
+
+  if (zeroIdx.length !== totalPages) {
+    throw new Error(`Reorder list must contain exactly ${totalPages} page numbers.`);
+  }
+
+  for (const idx of zeroIdx) {
+    if (idx < 0 || idx >= totalPages) {
+      throw new Error(`Page number out of bounds. Must be between 1 and ${totalPages}.`);
+    }
+  }
+
+  const newDoc = await PDFDocument.create();
+  const pages = await newDoc.copyPages(srcDoc, zeroIdx);
+  pages.forEach(p => newDoc.addPage(p));
+  const bytes = await newDoc.save();
+  return new Blob([bytes], { type: 'application/pdf' });
+}
+
+function parseReorderRanges(str, max) {
+  const indices = [];
+  str
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+    .forEach(part => {
+      if (part.includes('-')) {
+        const [a, b] = part.split('-').map(Number);
+        for (let i = a; i <= b; i++) {
+          if (i >= 1 && i <= max) indices.push(i - 1);
+        }
+      } else {
+        const n = Number(part);
+        if (n >= 1 && n <= max) indices.push(n - 1);
+      }
+    });
+  return indices;
 }
 
 // ── Internal helper ──────────────────────────────────────────────────────────
