@@ -150,7 +150,15 @@ export const TOOLS = [
     multiFile: false,
     acceptedFiles: { 'text/html': ['.html', '.htm'] },
     wasmEligible: false,
-    configSchema: [],
+    configSchema: [
+      {
+        key: 'conversionMode',
+        label: 'Conversion Mode',
+        type: 'select',
+        options: ['Code PDF', 'GUI Output PDF', 'Summary Output PDF'],
+        default: 'GUI Output PDF'
+      }
+    ],
   },
   {
     id: 'word-to-pdf',

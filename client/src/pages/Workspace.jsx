@@ -235,6 +235,15 @@ export default function Workspace() {
                 <ProgressBar value={progress} label="Uploading…" />
               )}
 
+              {tool.id === 'repair' && (
+                <div className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex gap-2.5 leading-relaxed">
+                  <span className="text-sm select-none">⚠️</span>
+                  <span>
+                    <strong>Note:</strong> If the PDF is heavily corrupted or fundamental file structural data is missing, complete recovery may not be possible.
+                  </span>
+                </div>
+              )}
+
               {/* Process button */}
               <button
                 onClick={handleProcess}

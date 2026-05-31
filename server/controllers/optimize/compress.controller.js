@@ -1,11 +1,12 @@
 'use strict';
-const { PDFDocument } = require('pdf-lib');
+const sharp = require('sharp');
+const { PDFDocument, PDFName, PDFRawStream, PDFNumber } = require('pdf-lib');
 const { createError } = require('../../middleware/errorHandler');
 
 const COMPRESSION_TIERS = {
-  low:    { objectsPerTick: 50,  useObjectStreams: false },
-  medium: { objectsPerTick: 20,  useObjectStreams: true  },
-  high:   { objectsPerTick: 5,   useObjectStreams: true  },
+  low:    { quality: 80, maxDimension: 2048, useObjectStreams: false, objectsPerTick: 50 },
+  medium: { quality: 65, maxDimension: 1200, useObjectStreams: true,  objectsPerTick: 20 },
+  high:   { quality: 45, maxDimension: 800,  useObjectStreams: true,  objectsPerTick: 5  },
 };
 
 /**
@@ -23,6 +24,61 @@ async function compressPdf(req, res, next) {
     const originalSize = req.file.size;
 
     const doc = await PDFDocument.load(req.file.buffer, { ignoreEncryption: true });
+
+    // Process and compress each image object in the PDF
+    const objects = doc.context.enumerateIndirectObjects();
+    for (const [ref, pdfObject] of objects) {
+      if (!(pdfObject instanceof PDFRawStream)) continue;
+
+      const subtype = pdfObject.dict.get(PDFName.of('Subtype'));
+      if (subtype !== PDFName.of('Image')) continue;
+
+      try {
+        const rawBytes = pdfObject.contents;
+        let img = sharp(rawBytes);
+        const metadata = await img.metadata();
+
+        if (metadata && metadata.width && metadata.height) {
+          const maxDim = tierConfig.maxDimension;
+          let newWidth = metadata.width;
+          let newHeight = metadata.height;
+
+          // Resize if width or height exceeds maximum dimension
+          if (metadata.width > maxDim || metadata.height > maxDim) {
+            if (metadata.width > metadata.height) {
+              newWidth = maxDim;
+              newHeight = Math.round((metadata.height * maxDim) / metadata.width);
+            } else {
+              newHeight = maxDim;
+              newWidth = Math.round((metadata.width * maxDim) / metadata.height);
+            }
+            img = img.resize(newWidth, newHeight);
+          }
+
+          let compressedBytes;
+          if (metadata.hasAlpha) {
+            // Compress transparent images as PNG with palette optimization
+            compressedBytes = await img
+              .png({ compressionLevel: 9, palette: true })
+              .toBuffer();
+            pdfObject.dict.set(PDFName.of('Filter'), PDFName.of('FlateDecode'));
+          } else {
+            // Compress other images as MozJPEG
+            compressedBytes = await img
+              .jpeg({ quality: tierConfig.quality, mozjpeg: true })
+              .toBuffer();
+            pdfObject.dict.set(PDFName.of('Filter'), PDFName.of('DCTDecode'));
+          }
+
+          pdfObject.contents = compressedBytes;
+          pdfObject.dict.set(PDFName.of('Width'), PDFNumber.of(newWidth));
+          pdfObject.dict.set(PDFName.of('Height'), PDFNumber.of(newHeight));
+          pdfObject.dict.set(PDFName.of('Length'), PDFNumber.of(compressedBytes.length));
+        }
+      } catch (err) {
+        // Fall back gracefully for unsupported image formats or parsing failures
+      }
+    }
 
     const compressedBytes = await doc.save({
       useObjectStreams: tierConfig.useObjectStreams,

@@ -1,7 +1,9 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: '/api/v1/pdf',
+  baseURL: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:5000/api/v1/pdf'
+    : '/api/v1/pdf',
   timeout: 120000, // 2 minutes for large files
 });
 
